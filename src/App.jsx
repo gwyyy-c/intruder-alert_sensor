@@ -3,7 +3,7 @@ import { TriangleAlert, Siren, Moon, Sun } from 'lucide-react';
 import './App.css';
 
 function App() {
-  const [detections, setDetections] = useState([]);
+  // Keep your existing states
   const [showAlert, setShowAlert] = useState(false);
   const [latestDistance, setLatestDistance] = useState(null);
   const [darkMode, setDarkMode] = useState(() => {
@@ -11,7 +11,9 @@ function App() {
     return saved ? JSON.parse(saved) : false;
   });
 
-  // Apply dark mode
+  const [logs, setLogs] = useState([]);
+
+  // Dark Mode Feature
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
     if (darkMode) {
@@ -21,46 +23,38 @@ function App() {
     }
   }, [darkMode]);
 
-  // Fetch detections from PHP backend (NOT SURE SA BACKEND)
+
   const fetchDetections = async () => {
     try {
-      const response = await fetch('/api/save_detection.php');
-      const html = await response.text();
+      const response = await fetch('http://localhost/ArduinoStuff/IntruderScanner/intruder_api.php');
+      const data = await response.json();
       
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const rows = doc.querySelectorAll('table tr');
-      
-      const data = [];
-      for (let i = 1; i < rows.length; i++) {
-        const cells = rows[i].querySelectorAll('td');
-        if (cells.length >= 3) {
-          data.push({
-            sensor_type: cells[0].textContent.trim(),
-            distance: cells[1].textContent.trim(),
-            time_detected: cells[2].textContent.trim()
-          });
-        }
-      }
-      
-      setDetections(data);
+      console.log('Logs:', data);
+      setLogs(data);
 
+      // Show alert if there's a new detection
       if (data.length > 0) {
         const latest = data[0];
         setLatestDistance(latest.distance);
         setShowAlert(true);
+        
+        // Hide alert after 3 seconds
         setTimeout(() => setShowAlert(false), 3000);
       }
     } catch (error) {
-      console.error('Error fetching detections:', error);
+      console.error('Fetch error:', error);
     }
   };
 
   useEffect(() => {
+    // Initial fetch
     fetchDetections();
+
+    // Auto-refresh every 5 seconds
     const interval = setInterval(() => {
       fetchDetections();
     }, 5000);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -89,20 +83,20 @@ function App() {
       <div className="dashboard">
         <div className="card">
           <h3>Total Detections</h3>
-          <div className="value">{detections.length}</div>
+          <div className="value">{logs.length}</div>
         </div>
 
         <div className="card">
           <h3>Latest Distance</h3>
           <div className="value">
-            {detections.length > 0 ? `${detections[0].distance} cm` : '--'}
+            {logs.length > 0 ? `${logs[0].distance} cm` : '--'}
           </div>
         </div>
 
         <div className="card">
           <h3>Status</h3>
           <div className="value status">
-            {detections.length > 0 ? 'ACTIVE' : 'MONITORING'}
+            {logs.length > 0 ? 'ACTIVE' : 'MONITORING'}
           </div>
         </div>
       </div>
@@ -113,28 +107,20 @@ function App() {
           <button onClick={fetchDetections}>Refresh</button>
         </div>
 
-        {detections.length > 0 ? (
-          <table>
-            <thead>
-              <tr>
-                <th>Sensor Type</th>
-                <th>Distance</th>
-                <th>Time Detected</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detections.map((detection, index) => (
-                <tr key={index}>
-                  <td>{detection.sensor_type}</td>
-                  <td>{detection.distance} cm</td>
-                  <td>{detection.time_detected}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="no-data">No detections yet</p>
-        )}
+        <div className='flex flex-col'>
+          {logs.length === 0 ? (
+            <p className='no-data'>No Detections Yet</p>
+          ) : (
+            logs.map((log) => (
+              <div key={log.id} className='log-item'>
+                <p><strong>ID:</strong> {log.id}</p>
+                <p><strong>Sensor:</strong> {log.sensor_type}</p>
+                <p><strong>Distance:</strong> {log.distance} cm</p>
+                <p><strong>Time:</strong> {log.time_detected}</p>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
